@@ -1,0 +1,5 @@
+{
+  "name": "FixMate",
+  "description": "A streamlined property maintenance request system featuring role-based access for Residents, Technicians, and Admins with built-in messaging and status tracking.",
+  "requestFramePermissions": []
+}
