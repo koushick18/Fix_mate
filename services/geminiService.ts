@@ -3,22 +3,15 @@ import { Issue } from "../types";
 
 // Helper to safely get the API Key regardless of the environment (Vite vs Node vs Browser)
 const getApiKey = () => {
+  // Guidelines: The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+  // We use a safe access pattern via globalThis to avoid TypeScript errors if 'process' is not defined in the type definitions.
   try {
-    // Check for standard process.env (Node/Webpack/AI Studio)
-    if (typeof process !== 'undefined' && process.env?.API_KEY) {
-      return process.env.API_KEY;
+    const globalAny = globalThis as any;
+    if (globalAny.process && globalAny.process.env && globalAny.process.env.API_KEY) {
+      return globalAny.process.env.API_KEY;
     }
   } catch (e) {
     // Ignore reference errors
-  }
-
-  try {
-    // Check for Vite environment variables
-    if ((import.meta as any).env?.VITE_API_KEY) {
-      return (import.meta as any).env.VITE_API_KEY;
-    }
-  } catch (e) {
-    // Ignore errors
   }
   
   return undefined;
