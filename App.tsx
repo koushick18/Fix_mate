@@ -5,44 +5,44 @@ import { ResidentView } from './views/ResidentView';
 import { TechnicianView } from './views/TechnicianView';
 import { AdminView } from './views/AdminView';
 import { AuthView } from './views/AuthView';
-import { runSystemDiagnostics } from './utils/testSuite';
+import { db } from './services/db';
 
 // Extend window for debugging
 declare global {
     interface Window { FixMateTests: any; }
 }
 
-const SESSION_KEY = 'fixmate_session_user';
-
 export default function App() {
-  // Start with no user logged in
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Check for existing session on mount
   useEffect(() => {
-    // Attach tests to window for debugging
-    window.FixMateTests = runSystemDiagnostics;
-
-    const savedUser = localStorage.getItem(SESSION_KEY);
-    if (savedUser) {
+    const initSession = async () => {
       try {
-        setCurrentUser(JSON.parse(savedUser));
+        const user = await db.getCurrentSession();
+        setCurrentUser(user);
       } catch (e) {
-        console.error("Invalid session data");
-        localStorage.removeItem(SESSION_KEY);
+        console.error("Session init error", e);
+      } finally {
+        setLoading(false);
       }
-    }
+    };
+    initSession();
   }, []);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await db.logout();
     setCurrentUser(null);
-    localStorage.removeItem(SESSION_KEY);
   };
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-teal-600">Loading FixMate...</div>;
+  }
 
   // Render View based on Role
   const renderDashboard = () => {

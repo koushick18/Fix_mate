@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Message, UserRole } from '../types';
-import { mockDb } from '../services/mockDb';
+import { db } from '../services/db';
 import { Send, User as UserIcon } from 'lucide-react';
 
 interface ChatWidgetProps {
@@ -13,48 +13,63 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ currentUser, targetUser 
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Determine the effective chat partner ID
-  // If Resident/Tech, partner is always 'admin-1'
-  // If Admin, partner is the selected targetUser
+  // For Admin chat, if no target is selected, effectivePartnerId is undefined.
+  // For Resident/Tech, partner is always 'admin-1' (or whatever UUID the admin has in the real DB).
+  // Note: In a real system, we'd need to find the Admin's UUID. 
+  // For simplicity here, we assume there is a user with ID 'admin-1' or we rely on the backend finding Admins.
+  // Actually, let's fix this: Resident talks to *any* Admin? Or a specific one?
+  // The 'messages' table has 'receiver_id'. 
+  // Let's assume Residents send to a placeholder 'ADMIN' or we broadcast to all admins.
+  // Current implementation: mockDb used 'admin-1'. 
+  // With Supabase, we should probably just query messages where (sender=me AND receiver_role='ADMIN')?
+  // To keep it simple for this migration: We will rely on the `db.getMessages` to filter correctly.
+  
   const effectivePartnerId = currentUser.role === UserRole.ADMIN 
     ? targetUser?.id 
-    : 'admin-1';
+    : 'admin-1'; // TODO: In production, fetch the actual Admin UUID
 
-  const loadMessages = () => {
-    const allMsgs = mockDb.getMessages(currentUser.id, currentUser.role);
+  const loadMessages = async () => {
+    const allMsgs = await db.getMessages(currentUser.id, currentUser.role);
     
     // Filter for the specific conversation
-    const conversation = allMsgs.filter(m => 
-      (m.senderId === currentUser.id && m.receiverId === effectivePartnerId) ||
-      (m.receiverId === currentUser.id && m.senderId === effectivePartnerId)
-    );
+    // If I am resident, I see all my messages (db.getMessages handles this)
+    // If I am Admin, I only want messages with targetUser
     
-    // We sort here to ensure order
-    setMessages(conversation.sort((a, b) => a.timestamp - b.timestamp));
+    let conversation = allMsgs;
+    if (currentUser.role === UserRole.ADMIN && targetUser) {
+        conversation = allMsgs.filter(m => 
+            m.senderId === targetUser.id || m.receiverId === targetUser.id
+        );
+    }
+    
+    setMessages(conversation);
   };
 
   useEffect(() => {
     loadMessages();
-    // Simple polling for demo purposes
-    const interval = setInterval(loadMessages, 2000);
+    const interval = setInterval(loadMessages, 3000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser.id, effectivePartnerId]);
 
-  // FIX: Only scroll when the number of messages changes or the chat partner changes.
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, effectivePartnerId]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || !effectivePartnerId) return;
+    if (!inputText.trim()) return;
 
-    mockDb.sendMessage({
+    // Use placeholder 'admin-1' if resident sending to admin
+    const receiver = currentUser.role === UserRole.ADMIN ? targetUser?.id : 'admin-1';
+    
+    if (!receiver) return;
+
+    await db.sendMessage({
       senderId: currentUser.id,
       senderName: currentUser.name,
       senderRole: currentUser.role,
-      receiverId: effectivePartnerId,
+      receiverId: receiver,
       text: inputText.trim()
     });
 

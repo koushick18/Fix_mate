@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
-import { Settings, Users, Wrench, Home, LogOut, Info, X } from 'lucide-react';
+import { Settings, Users, Wrench, Home, LogOut, Info, X, Wifi, WifiOff } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface LayoutProps {
   currentUser: User;
@@ -10,6 +11,23 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ currentUser, onLogout, children }) => {
   const [showBanner, setShowBanner] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    // Check if we have a valid URL (not the placeholder)
+    // Accessing the private property 'supabaseUrl' via type casting or checking specific behavior
+    const checkConnection = async () => {
+       const { data, error } = await supabase.from('profiles').select('count').limit(1);
+       // If the query works (even if 0 rows), we are connected. 
+       // If invalid URL, it usually throws an error or returns specific fetch failures.
+       if (!error || error.code === 'PGRST116') { 
+           setIsConnected(true);
+       } else {
+           setIsConnected(false);
+       }
+    };
+    checkConnection();
+  }, []);
 
   const getIcon = (role: UserRole) => {
     switch (role) {
@@ -21,19 +39,22 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, onLogout, children 
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Public Demo Warning Banner */}
+      {/* Network Status Banner */}
       {showBanner && (
-        <div className="bg-indigo-600 text-white px-4 py-2 text-sm font-medium relative shadow-md print:hidden">
+        <div className={`px-4 py-2 text-sm font-medium relative shadow-md print:hidden ${isConnected ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Info className="w-4 h-4 flex-shrink-0" />
+              {isConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
               <span>
-                <strong>Public Demo Mode:</strong> Data is stored locally on this device. You will not see updates from other users/browsers.
+                {isConnected 
+                  ? <strong>System Online: Connected to Supabase Database</strong>
+                  : <strong>Offline Mode: Database keys missing. Data will not save.</strong>
+                }
               </span>
             </div>
             <button 
               onClick={() => setShowBanner(false)}
-              className="ml-4 hover:bg-indigo-500 rounded p-1 transition-colors"
+              className="ml-4 hover:bg-white/20 rounded p-1 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

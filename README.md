@@ -5,23 +5,69 @@ FixMate is a comprehensive React-based web application designed to streamline pr
 ## 🚀 Features
 
 - **Role-Based Access Control**: Resident, Technician, Admin.
-- **Real-Time Status Tracking**: Visual status workflow.
+- **Real-Time Database**: Powered by Supabase (PostgreSQL).
 - **Messaging System**: Built-in chat functionality.
 - **Gemini AI Integration**: Generates executive summaries of maintenance workloads.
 - **Responsive Design**: Mobile-friendly UI.
 
-## 💾 Architecture & Database
-
-**Current Status: Serverless / LocalStorage**
-
-This demo uses a **Mock Database** (`services/mockDb.ts`) that persists data to your browser's `LocalStorage`.
-*   **Public Demo Limitation**: Since data is stored in the browser, users on different devices **cannot** see each other's data.
-
 ## 🛠 Tech Stack
 
 - **Frontend**: React 18, TypeScript, Tailwind CSS (Vite)
+- **Backend**: Supabase (Auth & Database)
 - **AI**: Google Gemini API (@google/genai)
 - **Visuals**: Lucide React, Recharts
+
+## 🗄️ Database Setup (Supabase)
+
+To run this app, you need a free [Supabase](https://supabase.com) project.
+
+1.  **Create Project**: Create a new project on Supabase.
+2.  **SQL Setup**: Go to the SQL Editor and run the following script:
+
+```sql
+-- Profiles
+create table public.profiles (
+  id uuid references auth.users on delete cascade not null primary key,
+  email text, name text, role text, avatar text
+);
+
+-- Issues
+create table public.issues (
+  id uuid default gen_random_uuid() primary key,
+  resident_id uuid references public.profiles(id),
+  resident_name text, category text, description text, photo_url text,
+  status text, priority text, assigned_to uuid references public.profiles(id),
+  assigned_to_name text, resolution_notes text,
+  created_at timestamptz default now(), updated_at timestamptz default now()
+);
+
+-- Messages
+create table public.messages (
+  id uuid default gen_random_uuid() primary key,
+  sender_id uuid references public.profiles(id),
+  sender_name text, sender_role text, receiver_id text, 
+  text text, timestamp bigint, created_at timestamptz default now()
+);
+
+-- Public Access Policies (For Demo Purposes)
+alter table public.profiles enable row level security;
+alter table public.issues enable row level security;
+alter table public.messages enable row level security;
+
+create policy "Public Access Profiles" on public.profiles for all using (true) with check (true);
+create policy "Public Access Issues" on public.issues for all using (true) with check (true);
+create policy "Public Access Messages" on public.messages for all using (true) with check (true);
+```
+
+## 🔑 Environment Variables
+
+Create a `.env` file locally or configure these in your hosting provider (Vercel/Netlify):
+
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_API_KEY=your_google_gemini_api_key
+```
 
 ## 🏃‍♂️ How to Run Locally
 
@@ -35,33 +81,9 @@ This demo uses a **Mock Database** (`services/mockDb.ts`) that persists data to 
     ```
 3.  **Open App**: Visit `http://localhost:5173`
 
-## ☁️ How to Deploy (Netlify/Vercel)
+## ☁️ Deployment (Vercel)
 
-You can host this for free in minutes.
-
-### **Option 1: Netlify (Recommended)**
-
-1.  **Push to GitHub**: Upload this project to a GitHub repository.
-2.  **Log in to Netlify**: Go to [netlify.com](https://netlify.com) and log in.
-3.  **New Site**: Click **"Add new site"** > **"Import an existing project"**.
-4.  **Connect GitHub**: Select your FixMate repository.
-5.  **Build Settings** (Netlify usually detects these automatically):
-    *   **Build command**: `npm run build`
-    *   **Publish directory**: `dist`
-6.  **Environment Variables**:
-    *   Click **"Add environment variable"**.
-    *   Key: `VITE_API_KEY`
-    *   Value: `YOUR_GOOGLE_GEMINI_API_KEY` (Get one at [aistudio.google.com](https://aistudiocdn.com))
-7.  **Deploy**: Click **"Deploy site"**.
-
-### **Option 2: Vercel**
-
-1.  **Push to GitHub**.
-2.  **Log in to Vercel**: Go to [vercel.com](https://vercel.com).
-3.  **Add New**: Click **"Add New..."** > **"Project"**.
-4.  **Import**: Select your repository.
-5.  **Environment Variables**:
-    *   Add `VITE_API_KEY` with your Gemini API key value.
-6.  **Deploy**: Click **"Deploy"**.
-
-Your app is now live! 🚀
+1.  Push code to **GitHub**.
+2.  Import project into **Vercel**.
+3.  Add the **Environment Variables** listed above in Vercel Settings.
+4.  Deploy!

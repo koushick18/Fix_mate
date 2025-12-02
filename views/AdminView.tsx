@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Issue, UserRole, IssueStatus } from '../types';
-import { mockDb } from '../services/mockDb';
+import { db } from '../services/db';
 import { StatusBadge } from '../components/StatusBadge';
 import { PriorityBadge } from '../components/PriorityBadge';
 import { ChatWidget } from '../components/ChatWidget';
@@ -10,8 +10,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
 } from 'recharts';
 import { 
-  Sparkles, User as UserIcon, Search, Trash2, Activity
+  Sparkles, User as UserIcon, Search, Trash2, Activity, CheckCircle, AlertTriangle
 } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 export const AdminView: React.FC<{ currentUser: User }> = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'issues' | 'chat'>('dashboard');
@@ -19,6 +20,7 @@ export const AdminView: React.FC<{ currentUser: User }> = ({ currentUser }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDbConnected, setIsDbConnected] = useState<boolean | null>(null);
   
   // Chat Selection
   const [chatTarget, setChatTarget] = useState<User | undefined>(undefined);
@@ -26,14 +28,30 @@ export const AdminView: React.FC<{ currentUser: User }> = ({ currentUser }) => {
   // AI Insight State
   const [aiSummary, setAiSummary] = useState<string>("");
   const [isLoadingAi, setIsLoadingAi] = useState(false);
+  const [isRunningTests, setIsRunningTests] = useState(false);
+
+  const loadData = async () => {
+    try {
+        const [loadedIssues, loadedUsers] = await Promise.all([
+            db.getIssues(),
+            db.getUsers()
+        ]);
+        setIssues(loadedIssues);
+        setUsers(loadedUsers);
+    } catch (e) {
+        console.error(e);
+    }
+  };
 
   useEffect(() => {
-    const load = () => {
-      setIssues(mockDb.getIssues());
-      setUsers(mockDb.getUsers());
-    };
-    load();
-    const interval = setInterval(load, 2000);
+    loadData();
+    const interval = setInterval(loadData, 5000);
+    
+    // Check DB health on mount
+    supabase.from('profiles').select('count').limit(1).then(({ error }) => {
+        setIsDbConnected(!error);
+    });
+
     return () => clearInterval(interval);
   }, []);
 
@@ -51,8 +69,10 @@ export const AdminView: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     return acc;
   }, [] as { name: string, value: number }[]);
 
-  const handleAssign = (issueId: string, techId: string) => {
-    mockDb.assignIssue(issueId, techId);
+  const handleAssign = async (issueId: string, techId: string) => {
+    const tech = users.find(u => u.id === techId);
+    await db.assignIssue(issueId, techId, tech?.name);
+    loadData();
   };
 
   const handleGenerateReport = async () => {
@@ -61,10 +81,12 @@ export const AdminView: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     setAiSummary(summary);
     setIsLoadingAi(false);
   };
-
-  const handleRunDiagnostics = () => {
-    const results = runSystemDiagnostics();
-    alert(results.message);
+  
+  const handleDiagnostics = async () => {
+      setIsRunningTests(true);
+      const results = await runSystemDiagnostics();
+      setIsRunningTests(false);
+      alert(results.message);
   };
 
   const technicians = users.filter(u => u.role === UserRole.TECHNICIAN);
@@ -96,27 +118,26 @@ export const AdminView: React.FC<{ currentUser: User }> = ({ currentUser }) => {
             </button>
           ))}
         </div>
-        {activeTab === 'dashboard' && (
-           <div className="flex gap-2">
-             <button
-                onClick={handleRunDiagnostics}
-                className="text-xs text-teal-600 hover:text-teal-800 hover:bg-teal-50 px-3 py-1 rounded flex items-center border border-transparent hover:border-teal-100"
-                title="Run System Diagnostics"
-             >
-                <Activity className="w-3 h-3 mr-1" /> Test System
-             </button>
-             <button 
-               onClick={() => {
-                 if(window.confirm('Are you sure you want to reset all data? This will clear all new users and issues.')) {
-                   mockDb.resetData();
-                 }
-               }}
-               className="text-xs text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1 rounded flex items-center mr-2 border border-transparent hover:border-red-100"
-             >
-               <Trash2 className="w-3 h-3 mr-1" /> Reset DB
-             </button>
-           </div>
-        )}
+        
+        {/* Admin Tools Toolbar */}
+        <div className="flex items-center px-4 gap-3">
+            {/* System Health Indicator */}
+            <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border ${isDbConnected ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                {isDbConnected ? <CheckCircle className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+                {isDbConnected ? 'DB Connected' : 'DB Error'}
+            </div>
+
+            <div className="h-4 w-px bg-gray-300"></div>
+
+            <button 
+                onClick={handleDiagnostics}
+                disabled={isRunningTests}
+                className="flex items-center text-xs font-medium text-gray-600 hover:text-teal-600 transition-colors disabled:opacity-50"
+            >
+                <Activity className={`w-3 h-3 mr-1 ${isRunningTests ? 'animate-pulse' : ''}`} />
+                {isRunningTests ? 'Checking...' : 'Run Diagnostics'}
+            </button>
+        </div>
       </div>
 
       {/* Dashboard */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Issue, IssueStatus, IssuePriority } from '../types';
-import { mockDb } from '../services/mockDb';
+import { db } from '../services/db';
 import { StatusBadge } from '../components/StatusBadge';
 import { PriorityBadge } from '../components/PriorityBadge';
 import { ChatWidget } from '../components/ChatWidget';
@@ -14,9 +14,10 @@ export const TechnicianView: React.FC<{ currentUser: User }> = ({ currentUser })
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
 
-  const loadIssues = () => {
-    const issues = mockDb.getIssues().filter(i => i.assignedTo === currentUser.id);
-    setAssignedIssues(issues.sort((a, b) => {
+  const loadIssues = async () => {
+    const issues = await db.getIssues();
+    const myTasks = issues.filter(i => i.assignedTo === currentUser.id);
+    setAssignedIssues(myTasks.sort((a, b) => {
       // 1. Sort by Priority (High first)
       const priorityWeight = { [IssuePriority.HIGH]: 3, [IssuePriority.MEDIUM]: 2, [IssuePriority.LOW]: 1 };
       if (priorityWeight[a.priority] !== priorityWeight[b.priority]) {
@@ -32,15 +33,14 @@ export const TechnicianView: React.FC<{ currentUser: User }> = ({ currentUser })
 
   useEffect(() => {
     loadIssues();
-    const interval = setInterval(loadIssues, 2000);
+    const interval = setInterval(loadIssues, 5000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser.id]);
 
-  const handleStatusChange = (issue: Issue) => {
+  const handleStatusChange = async (issue: Issue) => {
     if (issue.status === IssueStatus.ASSIGNED) {
       // Start Work
-      mockDb.updateIssueStatus(issue.id, IssueStatus.IN_PROGRESS);
+      await db.updateIssueStatus(issue.id, IssueStatus.IN_PROGRESS);
       loadIssues();
     } else if (issue.status === IssueStatus.IN_PROGRESS) {
       // Open Resolution Input
@@ -48,9 +48,9 @@ export const TechnicianView: React.FC<{ currentUser: User }> = ({ currentUser })
     }
   };
 
-  const submitResolution = (issueId: string) => {
+  const submitResolution = async (issueId: string) => {
     if (!resolutionNote.trim()) return;
-    mockDb.updateIssueStatus(issueId, IssueStatus.RESOLVED, resolutionNote);
+    await db.updateIssueStatus(issueId, IssueStatus.RESOLVED, resolutionNote);
     setResolvingId(null);
     setResolutionNote('');
     loadIssues();

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { User, Issue, IssueCategory, IssuePriority } from '../types';
-import { mockDb } from '../services/mockDb';
+import { db } from '../services/db';
 import { StatusBadge } from '../components/StatusBadge';
 import { PriorityBadge } from '../components/PriorityBadge';
 import { ChatWidget } from '../components/ChatWidget';
-import { Plus, MessageSquare, ClipboardList, AlertCircle } from 'lucide-react';
+import { Plus, MessageSquare, ClipboardList, AlertCircle, RefreshCw } from 'lucide-react';
 
 const CATEGORY_IMAGES: Record<IssueCategory, string> = {
   [IssueCategory.ELECTRICAL]: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=600&h=400&auto=format&fit=crop',
@@ -17,29 +17,37 @@ const CATEGORY_IMAGES: Record<IssueCategory, string> = {
 export const ResidentView: React.FC<{ currentUser: User }> = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState<'issues' | 'create' | 'chat'>('issues');
   const [myIssues, setMyIssues] = useState<Issue[]>([]);
+  const [loading, setLoading] = useState(false);
   
   // Form State
   const [category, setCategory] = useState<IssueCategory>(IssueCategory.ELECTRICAL);
   const [priority, setPriority] = useState<IssuePriority>(IssuePriority.MEDIUM);
   const [description, setDescription] = useState('');
 
+  const loadIssues = async () => {
+    try {
+        const issues = await db.getIssues();
+        const myOwn = issues.filter(i => i.residentId === currentUser.id);
+        setMyIssues(myOwn.sort((a, b) => b.createdAt - a.createdAt));
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
   useEffect(() => {
-    const load = () => {
-      const issues = mockDb.getIssues().filter(i => i.residentId === currentUser.id);
-      setMyIssues(issues.sort((a, b) => b.createdAt - a.createdAt));
-    };
-    load();
-    const interval = setInterval(load, 2000); // Polling for updates
+    loadIssues();
+    const interval = setInterval(loadIssues, 5000); // Poll slower for remote DB
     return () => clearInterval(interval);
   }, [currentUser.id]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     
     // Select image based on category for realism
     const image = CATEGORY_IMAGES[category] || CATEGORY_IMAGES[IssueCategory.OTHER];
     
-    mockDb.addIssue({
+    await db.addIssue({
       residentId: currentUser.id,
       residentName: currentUser.name,
       category,
@@ -47,9 +55,12 @@ export const ResidentView: React.FC<{ currentUser: User }> = ({ currentUser }) =
       description,
       photoUrl: image
     });
+    
     setDescription('');
     setPriority(IssuePriority.MEDIUM);
+    setLoading(false);
     setActiveTab('issues');
+    loadIssues();
   };
 
   return (
@@ -166,20 +177,12 @@ export const ResidentView: React.FC<{ currentUser: User }> = ({ currentUser }) =
               />
             </div>
             
-            <div className="bg-teal-50 p-4 rounded-md flex items-start">
-               <div className="flex-shrink-0">
-                 <AlertCircle className="h-5 w-5 text-teal-400" />
-               </div>
-               <div className="ml-3 flex-1 md:flex md:justify-between">
-                 <p className="text-sm text-teal-700">A category-specific sample image will be attached automatically for testing purposes.</p>
-               </div>
-            </div>
-
             <button
               type="submit"
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+              disabled={loading}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50"
             >
-              Submit Request
+              {loading ? 'Submitting...' : 'Submit Request'}
             </button>
           </form>
         </div>
