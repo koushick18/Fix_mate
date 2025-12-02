@@ -1,4 +1,5 @@
-import { supabase } from './supabaseClient';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { mockDb } from './mockDb';
 import { Issue, IssueStatus, IssuePriority, IssueCategory, Message, User, UserRole } from '../types';
 
 // Map Supabase 'profiles' to App 'User'
@@ -10,12 +11,18 @@ const mapProfileToUser = (profile: any): User => ({
   avatar: profile.avatar
 });
 
+/**
+ * Hybrid Database Service
+ * Automatically switches between Supabase (Live) and mockDb (Local)
+ * based on environment configuration.
+ */
 export const db = {
   // --- AUTH ---
   getCurrentSession: async () => {
+    if (!isSupabaseConfigured) return mockDb.getCurrentSession();
+
     const { data } = await supabase.auth.getSession();
     if (data.session?.user) {
-      // Fetch profile details
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
@@ -28,6 +35,8 @@ export const db = {
   },
 
   login: async (email: string, password: string): Promise<User> => {
+    if (!isSupabaseConfigured) return mockDb.login(email, password);
+
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     
@@ -45,11 +54,13 @@ export const db = {
   },
 
   logout: async () => {
+    if (!isSupabaseConfigured) return mockDb.logout();
     await supabase.auth.signOut();
   },
 
   register: async (name: string, email: string, password: string, role: UserRole): Promise<User> => {
-    // 1. Sign up in Auth
+    if (!isSupabaseConfigured) return mockDb.register(name, email, password, role);
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -58,7 +69,6 @@ export const db = {
     if (error) throw error;
     if (!data.user) throw new Error("Registration failed");
 
-    // 2. Create Profile
     const newUser: User = {
       id: data.user.id,
       name,
@@ -81,18 +91,20 @@ export const db = {
 
   // --- USERS ---
   getUsers: async (): Promise<User[]> => {
+    if (!isSupabaseConfigured) return mockDb.getUsers();
     const { data } = await supabase.from('profiles').select('*');
     return (data || []).map(mapProfileToUser);
   },
 
   // --- ISSUES ---
   getIssues: async (): Promise<Issue[]> => {
+    if (!isSupabaseConfigured) return mockDb.getIssues();
+
     const { data, error } = await supabase.from('issues').select('*');
     if (error) {
       console.error("Error fetching issues", error);
       return [];
     }
-    // Map snake_case to camelCase
     return data.map((i: any) => ({
       ...i,
       residentId: i.resident_id,
@@ -107,6 +119,8 @@ export const db = {
   },
 
   addIssue: async (issue: Partial<Issue>) => {
+    if (!isSupabaseConfigured) return mockDb.addIssue(issue as any);
+
     const dbIssue = {
       resident_id: issue.residentId,
       resident_name: issue.residentName,
@@ -125,6 +139,8 @@ export const db = {
   },
 
   updateIssueStatus: async (id: string, status: IssueStatus, notes?: string) => {
+    if (!isSupabaseConfigured) return mockDb.updateIssueStatus(id, status, notes);
+
     const updateData: any = { 
       status, 
       updated_at: new Date().toISOString() 
@@ -135,6 +151,8 @@ export const db = {
   },
 
   assignIssue: async (issueId: string, technicianId: string, technicianName?: string) => {
+    if (!isSupabaseConfigured) return mockDb.assignIssue(issueId, technicianId, technicianName);
+
     if (!technicianId) {
       // Unassign
       await supabase.from('issues').update({
@@ -156,9 +174,9 @@ export const db = {
 
   // --- MESSAGES ---
   getMessages: async (userId: string, role: UserRole): Promise<Message[]> => {
+    if (!isSupabaseConfigured) return mockDb.getMessages(userId, role);
+
     let query = supabase.from('messages').select('*');
-    
-    // If not admin, only show own messages
     if (role !== UserRole.ADMIN) {
       query = query.or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
     }
@@ -177,6 +195,8 @@ export const db = {
   },
 
   sendMessage: async (msg: Partial<Message>) => {
+    if (!isSupabaseConfigured) return mockDb.sendMessage(msg as any);
+
     const dbMsg = {
       sender_id: msg.senderId,
       sender_name: msg.senderName,
@@ -190,19 +210,21 @@ export const db = {
     await supabase.from('messages').insert(dbMsg);
   },
 
-  // --- SEEDING (PRODUCTION) ---
+  // --- SEEDING ---
   seedSampleData: async () => {
-    // 1. Create Fake Techs in Profiles (Note: They won't have auth logins, but will appear in dropdowns)
+    if (!isSupabaseConfigured) return mockDb.seedSampleData();
+
+    // 1. Create Fake Techs (Ghost Users)
+    // Note: We used fixed UUIDs to ensure idempotency (running seed multiple times doesn't duplicate)
     const seedTechs = [
-      { id: '00000000-0000-0000-0000-000000000001', email: 'tom@tech.com', name: 'Tom Tech', role: 'TECHNICIAN', avatar: 'https://picsum.photos/seed/tom/200' },
-      { id: '00000000-0000-0000-0000-000000000002', email: 'sarah@tech.com', name: 'Sarah Tech', role: 'TECHNICIAN', avatar: 'https://picsum.photos/seed/sarah/200' }
+      { id: '11111111-1111-1111-1111-111111111111', email: 'tom@tech.com', name: 'Tom Tech', role: 'TECHNICIAN', avatar: 'https://picsum.photos/seed/tom/200' },
+      { id: '22222222-2222-2222-2222-222222222222', email: 'sarah@tech.com', name: 'Sarah Tech', role: 'TECHNICIAN', avatar: 'https://picsum.photos/seed/sarah/200' }
     ];
 
     await supabase.from('profiles').upsert(seedTechs);
 
     // 2. Create Sample Issues
-    // We use a dummy resident ID or just the current admin for visibility
-    const dummyResidentId = '00000000-0000-0000-0000-000000000003';
+    const dummyResidentId = '33333333-3333-3333-3333-333333333333';
     
     const seedIssues = [
       {

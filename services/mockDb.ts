@@ -1,6 +1,7 @@
 import { Issue, IssueCategory, IssueStatus, IssuePriority, Message, User, UserRole } from '../types';
 
 const STORAGE_KEY = 'fixmate_db_v1';
+const SESSION_KEY = 'fixmate_session_v1';
 
 // Initial Seed Data
 const SEED_USERS: User[] = [
@@ -53,7 +54,7 @@ const SEED_ISSUES: Issue[] = [
     residentName: 'Alice Resident',
     category: IssueCategory.PLUMBING,
     description: 'Leaky faucet in the kitchen.',
-    photoUrl: 'https://images.unsplash.com/photo-1585129777179-72c019d3f18e?q=80&w=600&h=400&auto=format&fit=crop',
+    photoUrl: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?q=80&w=600&h=400&auto=format&fit=crop',
     status: IssueStatus.OPEN,
     priority: IssuePriority.MEDIUM,
     createdAt: Date.now() - 86400000 * 2,
@@ -65,7 +66,7 @@ const SEED_ISSUES: Issue[] = [
     residentName: 'Bob Resident',
     category: IssueCategory.ELECTRICAL,
     description: 'Light flickering in the hallway.',
-    photoUrl: 'https://images.unsplash.com/photo-1555963966-b7ae5404b6ed?q=80&w=600&h=400&auto=format&fit=crop',
+    photoUrl: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=600&h=400&auto=format&fit=crop',
     status: IssueStatus.ASSIGNED,
     priority: IssuePriority.HIGH,
     assignedTo: 'tech-1',
@@ -79,7 +80,7 @@ const SEED_ISSUES: Issue[] = [
     residentName: 'Alice Resident',
     category: IssueCategory.CARPENTRY,
     description: 'Cabinet door hinge is broken.',
-    photoUrl: 'https://images.unsplash.com/photo-1595428774223-ef52624120d2?q=80&w=600&h=400&auto=format&fit=crop',
+    photoUrl: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?q=80&w=600&h=400&auto=format&fit=crop',
     status: IssueStatus.RESOLVED,
     priority: IssuePriority.LOW,
     assignedTo: 'tech-2',
@@ -102,7 +103,7 @@ const SEED_ISSUES: Issue[] = [
     createdAt: Date.now() - 43200000,
     updatedAt: Date.now() - 3600000,
   },
-  // Stress Test Item: Long description to test UI wrapping
+  // Stress Test Item
   {
     id: '5',
     residentId: 'res-1',
@@ -151,11 +152,11 @@ const saveToStorage = () => {
 loadFromStorage();
 
 export const mockDb = {
-  getUsers: () => [...users],
+  getUsers: async () => [...users],
   
-  getIssues: () => [...issues],
+  getIssues: async () => [...issues],
 
-  addIssue: (issue: Omit<Issue, 'id' | 'status' | 'createdAt' | 'updatedAt'>) => {
+  addIssue: async (issue: Omit<Issue, 'id' | 'status' | 'createdAt' | 'updatedAt'>) => {
     const newIssue: Issue = {
       ...issue,
       id: Math.random().toString(36).substr(2, 9),
@@ -168,7 +169,7 @@ export const mockDb = {
     return newIssue;
   },
 
-  updateIssueStatus: (id: string, status: IssueStatus, notes?: string) => {
+  updateIssueStatus: async (id: string, status: IssueStatus, notes?: string) => {
     const issue = issues.find(i => i.id === id);
     if (issue) {
       issue.status = status;
@@ -178,12 +179,14 @@ export const mockDb = {
     }
   },
 
-  assignIssue: (issueId: string, technicianId: string) => {
+  assignIssue: async (issueId: string, technicianId: string, technicianName?: string) => {
     const issue = issues.find(i => i.id === issueId);
+    
+    // In mock mode, we find the tech by ID to confirm existence
     const tech = users.find(u => u.id === technicianId);
     
     if (issue) {
-      if (technicianId === "") {
+      if (!technicianId) {
         // Handle Unassignment
         issue.assignedTo = undefined;
         issue.assignedToName = undefined;
@@ -199,12 +202,12 @@ export const mockDb = {
     }
   },
 
-  getMessages: (userId: string, role: UserRole) => {
+  getMessages: async (userId: string, role: UserRole) => {
     if (role === UserRole.ADMIN) return messages;
     return messages.filter(m => m.senderId === userId || m.receiverId === userId);
   },
 
-  sendMessage: (message: Omit<Message, 'id' | 'timestamp'>) => {
+  sendMessage: async (message: Omit<Message, 'id' | 'timestamp'>) => {
     const newMessage: Message = {
       ...message,
       id: Math.random().toString(36).substr(2, 9),
@@ -216,17 +219,33 @@ export const mockDb = {
   },
 
   // --- AUTHENTICATION METHODS ---
-
-  authenticate: (email: string, pass: string): User | undefined => {
-    return users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === pass);
+  getCurrentSession: async (): Promise<User | null> => {
+     try {
+       const session = localStorage.getItem(SESSION_KEY);
+       if(session) {
+         return JSON.parse(session);
+       }
+     } catch(e) {}
+     return null;
   },
 
-  register: (name: string, email: string, pass: string, role: UserRole): User => {
+  login: async (email: string, pass: string): Promise<User> => {
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === pass);
+    if (!user) throw new Error("Invalid credentials (Mock DB)");
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    return user;
+  },
+
+  logout: async () => {
+    localStorage.removeItem(SESSION_KEY);
+  },
+
+  register: async (name: string, email: string, pass: string, role: UserRole): Promise<User> => {
     if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
       throw new Error("User with this email already exists.");
     }
     if (role === UserRole.ADMIN) {
-       throw new Error("Cannot register as Admin.");
+       throw new Error("Cannot register as Admin in demo.");
     }
 
     const newUser: User = {
@@ -240,14 +259,16 @@ export const mockDb = {
     
     users.push(newUser);
     saveToStorage();
+    localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
     return newUser;
   },
 
-  resetData: () => {
-    localStorage.removeItem(STORAGE_KEY);
-    users = [...SEED_USERS];
-    issues = [...SEED_ISSUES];
-    messages = [];
-    window.location.reload();
+  seedSampleData: async () => {
+     // In Mock DB, resetting data essentially re-seeds it
+     localStorage.removeItem(STORAGE_KEY);
+     users = [...SEED_USERS];
+     issues = [...SEED_ISSUES];
+     messages = [];
+     loadFromStorage();
   }
 };

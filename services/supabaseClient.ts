@@ -27,12 +27,17 @@ const getEnv = (key: string) => {
 const supabaseUrl = getEnv('VITE_SUPABASE_URL');
 const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY');
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Missing Supabase Environment Variables! Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file or hosting configuration.");
+export const isSupabaseConfigured = 
+  supabaseUrl && 
+  supabaseAnonKey && 
+  !supabaseUrl.includes('placeholder') &&
+  !supabaseAnonKey.includes('placeholder');
+
+if (!isSupabaseConfigured) {
+  console.warn("FixMate: Running in Demo Mode (Local Storage). Add VITE_SUPABASE_URL to .env to go live.");
 }
 
 // Initialize Supabase. If keys are missing, we provide placeholders to prevent the app from crashing immediately on load.
-// API calls will fail gracefully instead of a blank screen.
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co', 
   supabaseAnonKey || 'placeholder'

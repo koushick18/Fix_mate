@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, UserRole } from '../types';
 import { db } from '../services/db';
-import { Home, Wrench, UserPlus, LogIn, AlertCircle, Loader2 } from 'lucide-react';
+import { Home, Wrench, UserPlus, LogIn, AlertCircle, Loader2, Zap } from 'lucide-react';
 
 interface AuthViewProps {
   onLogin: (user: User) => void;
@@ -34,6 +34,20 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
       setError(err.message || "Authentication failed. Check your credentials.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const autoFill = (role: string) => {
+    setIsLogin(true);
+    if (role === 'ADMIN') {
+      setEmail('admin@fixmate.com');
+      setPassword('admin');
+    } else if (role === 'TECH') {
+      setEmail('tom@tech.com');
+      setPassword('password');
+    } else {
+      setEmail('alice@res.com');
+      setPassword('password');
     }
   };
 
@@ -160,6 +174,35 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
               </button>
             </div>
           </form>
+
+          {/* Quick Login Chips */}
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">
+                  Quick Login (Demo / Test)
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <button onClick={() => autoFill('RES')} className="flex flex-col items-center justify-center p-2 border border-gray-200 rounded hover:bg-teal-50 hover:border-teal-200 transition-colors">
+                <span className="text-xs font-bold text-gray-700">Resident</span>
+                <span className="text-[10px] text-gray-500">Alice</span>
+              </button>
+              <button onClick={() => autoFill('TECH')} className="flex flex-col items-center justify-center p-2 border border-gray-200 rounded hover:bg-teal-50 hover:border-teal-200 transition-colors">
+                <span className="text-xs font-bold text-gray-700">Tech</span>
+                <span className="text-[10px] text-gray-500">Tom</span>
+              </button>
+              <button onClick={() => autoFill('ADMIN')} className="flex flex-col items-center justify-center p-2 border border-gray-200 rounded hover:bg-teal-50 hover:border-teal-200 transition-colors">
+                 <Zap className="w-3 h-3 text-amber-500 mb-1" />
+                <span className="text-xs font-bold text-gray-700">Admin</span>
+              </button>
+            </div>
+          </div>
 
           <div className="mt-6">
             <div className="relative">

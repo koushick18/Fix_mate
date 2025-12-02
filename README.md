@@ -5,33 +5,30 @@ FixMate is a comprehensive React-based web application designed to streamline pr
 ## 🚀 Features
 
 - **Role-Based Access Control**: Resident, Technician, Admin.
-- **Real-Time Database**: Powered by Supabase (PostgreSQL).
+- **Hybrid Database**: Automatically switches between Real Cloud DB (Supabase) and Local Demo DB.
 - **Messaging System**: Built-in chat functionality.
 - **Gemini AI Integration**: Generates executive summaries of maintenance workloads.
-- **Responsive Design**: Mobile-friendly UI.
-
-## 🛠 Tech Stack
-
-- **Frontend**: React 18, TypeScript, Tailwind CSS (Vite)
-- **Backend**: Supabase (Auth & Database)
-- **AI**: Google Gemini API (@google/genai)
-- **Visuals**: Lucide React, Recharts
 
 ## 🗄️ Database Setup (Supabase)
 
-To run this app, you need a free [Supabase](https://supabase.com) project.
-
-1.  **Create Project**: Create a new project on Supabase.
-2.  **SQL Setup**: Go to the SQL Editor and run the following script:
+If you want to use the Live Database features, run this script in your Supabase SQL Editor.
 
 ```sql
--- Profiles
+-- RESET (Be careful, deletes existing data)
+drop table if exists public.messages;
+drop table if exists public.issues;
+drop table if exists public.profiles;
+
+-- 1. Create Profiles Table (Removed strict FK to allow Ghost Users for Demo)
 create table public.profiles (
-  id uuid references auth.users on delete cascade not null primary key,
-  email text, name text, role text, avatar text
+  id uuid not null primary key, -- No longer references auth.users strictly
+  email text,
+  name text,
+  role text,
+  avatar text
 );
 
--- Issues
+-- 2. Create Issues Table
 create table public.issues (
   id uuid default gen_random_uuid() primary key,
   resident_id uuid references public.profiles(id),
@@ -41,7 +38,7 @@ create table public.issues (
   created_at timestamptz default now(), updated_at timestamptz default now()
 );
 
--- Messages
+-- 3. Create Messages Table
 create table public.messages (
   id uuid default gen_random_uuid() primary key,
   sender_id uuid references public.profiles(id),
@@ -49,7 +46,7 @@ create table public.messages (
   text text, timestamp bigint, created_at timestamptz default now()
 );
 
--- Public Access Policies (For Demo Purposes)
+-- 4. Enable Public Access
 alter table public.profiles enable row level security;
 alter table public.issues enable row level security;
 alter table public.messages enable row level security;
@@ -61,29 +58,10 @@ create policy "Public Access Messages" on public.messages for all using (true) w
 
 ## 🔑 Environment Variables
 
-Create a `.env` file locally or configure these in your hosting provider (Vercel/Netlify):
+Configure these in Vercel:
 
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_API_KEY=your_google_gemini_api_key
 ```
-
-## 🏃‍♂️ How to Run Locally
-
-1.  **Install Dependencies**:
-    ```bash
-    npm install
-    ```
-2.  **Start Dev Server**:
-    ```bash
-    npm run dev
-    ```
-3.  **Open App**: Visit `http://localhost:5173`
-
-## ☁️ Deployment (Vercel)
-
-1.  Push code to **GitHub**.
-2.  Import project into **Vercel**.
-3.  Add the **Environment Variables** listed above in Vercel Settings.
-4.  Deploy!
