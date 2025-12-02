@@ -61,6 +61,7 @@ export const db = {
   register: async (name: string, email: string, password: string, role: UserRole): Promise<User> => {
     if (!isSupabaseConfigured) return mockDb.register(name, email, password, role);
 
+    // 1. Sign Up in Auth
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -69,6 +70,7 @@ export const db = {
     if (error) throw error;
     if (!data.user) throw new Error("Registration failed");
 
+    // 2. Create Profile
     const newUser: User = {
       id: data.user.id,
       name,
@@ -85,7 +87,11 @@ export const db = {
       avatar: newUser.avatar
     });
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      // If profile creation fails (e.g. table doesn't exist), clean up auth user if possible or throw helpful error
+      console.error("Profile creation failed", dbError);
+      throw new Error("Account created but profile failed. Please contact admin or check database setup.");
+    }
     return newUser;
   },
 

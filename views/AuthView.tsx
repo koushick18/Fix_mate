@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { User, UserRole } from '../types';
 import { db } from '../services/db';
-import { Home, Wrench, UserPlus, LogIn, AlertCircle, Loader2, Zap } from 'lucide-react';
+import { setDemoMode, isSupabaseConfigured } from '../services/supabaseClient';
+import { Home, Wrench, UserPlus, LogIn, AlertCircle, Loader2, Zap, WifiOff } from 'lucide-react';
 
 interface AuthViewProps {
   onLogin: (user: User) => void;
@@ -31,7 +32,14 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Authentication failed. Check your credentials.");
+      let msg = err.message || "Authentication failed.";
+      
+      // Smart Error Handling for Network Issues
+      if (msg.includes('fetch') || msg.includes('network') || msg.includes('connection')) {
+        msg = "Connection to server failed.";
+      }
+      
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -72,6 +80,32 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          
+          {/* Demo Mode Switcher for Troubleshooting */}
+          {isSupabaseConfigured && error.includes('Connection') && (
+             <div className="mb-4 bg-yellow-50 border border-yellow-200 p-3 rounded-md flex flex-col items-start gap-2">
+                <p className="text-xs text-yellow-800 flex items-center">
+                  <WifiOff className="w-3 h-3 mr-1"/> 
+                  Server unreachable.
+                </p>
+                <button 
+                  onClick={() => setDemoMode(true)}
+                  className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded border border-yellow-300 hover:bg-yellow-200 font-medium w-full"
+                >
+                  Switch to Offline Demo Mode
+                </button>
+             </div>
+          )}
+
+          {!isSupabaseConfigured && (
+             <div className="mb-6 bg-teal-50 border border-teal-200 p-2 rounded-md text-center">
+                <p className="text-xs text-teal-800">
+                   Running in <strong>Demo Mode</strong>. Data is saved locally.
+                   <button onClick={() => setDemoMode(false)} className="ml-2 underline text-teal-600">Go Online</button>
+                </p>
+             </div>
+          )}
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             
             {!isLogin && (
@@ -175,7 +209,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
             </div>
           </form>
 
-          {/* Quick Login Chips */}
+          {/* Quick Login Chips - Demo Convenience */}
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -183,7 +217,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-2 bg-white text-gray-500">
-                  Quick Login (Demo / Test)
+                  Quick Fill Credentials
                 </span>
               </div>
             </div>
