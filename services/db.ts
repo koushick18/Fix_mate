@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Issue, IssueStatus, Message, User, UserRole } from '../types';
+import { Issue, IssueStatus, IssuePriority, IssueCategory, Message, User, UserRole } from '../types';
 
 // Map Supabase 'profiles' to App 'User'
 const mapProfileToUser = (profile: any): User => ({
@@ -188,5 +188,59 @@ export const db = {
     };
     
     await supabase.from('messages').insert(dbMsg);
+  },
+
+  // --- SEEDING (PRODUCTION) ---
+  seedSampleData: async () => {
+    // 1. Create Fake Techs in Profiles (Note: They won't have auth logins, but will appear in dropdowns)
+    const seedTechs = [
+      { id: '00000000-0000-0000-0000-000000000001', email: 'tom@tech.com', name: 'Tom Tech', role: 'TECHNICIAN', avatar: 'https://picsum.photos/seed/tom/200' },
+      { id: '00000000-0000-0000-0000-000000000002', email: 'sarah@tech.com', name: 'Sarah Tech', role: 'TECHNICIAN', avatar: 'https://picsum.photos/seed/sarah/200' }
+    ];
+
+    await supabase.from('profiles').upsert(seedTechs);
+
+    // 2. Create Sample Issues
+    // We use a dummy resident ID or just the current admin for visibility
+    const dummyResidentId = '00000000-0000-0000-0000-000000000003';
+    
+    const seedIssues = [
+      {
+        resident_id: dummyResidentId,
+        resident_name: 'Alice Resident',
+        category: IssueCategory.PLUMBING,
+        description: 'Leaky faucet in the kitchen.',
+        photo_url: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?q=80&w=600&h=400&auto=format&fit=crop',
+        status: IssueStatus.OPEN,
+        priority: IssuePriority.MEDIUM,
+      },
+      {
+        resident_id: dummyResidentId,
+        resident_name: 'Bob Resident',
+        category: IssueCategory.ELECTRICAL,
+        description: 'Light flickering in the hallway.',
+        photo_url: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=600&h=400&auto=format&fit=crop',
+        status: IssueStatus.ASSIGNED,
+        priority: IssuePriority.HIGH,
+        assigned_to: seedTechs[0].id,
+        assigned_to_name: seedTechs[0].name
+      },
+      {
+        resident_id: dummyResidentId,
+        resident_name: 'Charlie Resident',
+        category: IssueCategory.CARPENTRY,
+        description: 'Cabinet door hinge is broken.',
+        photo_url: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?q=80&w=600&h=400&auto=format&fit=crop',
+        status: IssueStatus.RESOLVED,
+        priority: IssuePriority.LOW,
+        assigned_to: seedTechs[1].id,
+        assigned_to_name: seedTechs[1].name,
+        resolution_notes: 'Replaced the hinge with a new soft-close model.'
+      }
+    ];
+
+    for (const issue of seedIssues) {
+      await supabase.from('issues').insert(issue);
+    }
   }
 };

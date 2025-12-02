@@ -10,7 +10,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
 } from 'recharts';
 import { 
-  Sparkles, User as UserIcon, Search, Trash2, Activity, CheckCircle, AlertTriangle
+  Sparkles, User as UserIcon, Search, Trash2, Activity, CheckCircle, AlertTriangle, Database
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
@@ -29,6 +29,7 @@ export const AdminView: React.FC<{ currentUser: User }> = ({ currentUser }) => {
   const [aiSummary, setAiSummary] = useState<string>("");
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [isRunningTests, setIsRunningTests] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const loadData = async () => {
     try {
@@ -89,6 +90,21 @@ export const AdminView: React.FC<{ currentUser: User }> = ({ currentUser }) => {
       alert(results.message);
   };
 
+  const handleSeedData = async () => {
+    if (!confirm("This will add sample data (Technicians and Issues) to the live database. Continue?")) return;
+    setIsSeeding(true);
+    try {
+      await db.seedSampleData();
+      await loadData();
+      alert("Sample data loaded successfully!");
+    } catch (e) {
+      alert("Failed to seed data. Check console.");
+      console.error(e);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   const technicians = users.filter(u => u.role === UserRole.TECHNICIAN);
 
   // Filter Issues Logic
@@ -102,8 +118,8 @@ export const AdminView: React.FC<{ currentUser: User }> = ({ currentUser }) => {
   return (
     <div className="space-y-6">
       {/* Sub-nav */}
-      <div className="flex justify-between items-center border-b border-gray-200 bg-white p-1 rounded-t-lg">
-        <div className="flex space-x-1">
+      <div className="flex flex-col sm:flex-row justify-between items-center border-b border-gray-200 bg-white p-1 rounded-t-lg gap-4 sm:gap-0">
+        <div className="flex space-x-1 w-full sm:w-auto overflow-x-auto">
           {['dashboard', 'issues', 'chat'].map((tab) => (
             <button
               key={tab}
@@ -120,12 +136,23 @@ export const AdminView: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         </div>
         
         {/* Admin Tools Toolbar */}
-        <div className="flex items-center px-4 gap-3">
+        <div className="flex items-center px-4 gap-3 w-full sm:w-auto justify-end">
             {/* System Health Indicator */}
-            <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border ${isDbConnected ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+            <div className={`hidden sm:flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border ${isDbConnected ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                 {isDbConnected ? <CheckCircle className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
                 {isDbConnected ? 'DB Connected' : 'DB Error'}
             </div>
+
+            <div className="hidden sm:block h-4 w-px bg-gray-300"></div>
+
+            <button 
+                onClick={handleSeedData}
+                disabled={isSeeding}
+                className="flex items-center text-xs font-medium text-gray-600 hover:text-teal-600 transition-colors disabled:opacity-50"
+            >
+               <Database className="w-3 h-3 mr-1" />
+               {isSeeding ? 'Loading...' : 'Load Sample Data'}
+            </button>
 
             <div className="h-4 w-px bg-gray-300"></div>
 
